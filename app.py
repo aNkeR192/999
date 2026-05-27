@@ -6,7 +6,7 @@ import threading
 import uvicorn
 
 app = FastAPI()
-API_KEY = "airsoft-demo-key-2024"
+API_KEY = "aNkeR192"
 
 KEYWORDS = {
     "Страйкбольное оружие": ["ak", "hk", "m4", "винтовка", "автомат", "пистолет", "дробовик", "калаш"],
