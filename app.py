@@ -2,14 +2,15 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from typing import List
 import gradio as gr
+import threading
+import uvicorn
 
 app = FastAPI()
-API_KEY = "aNkeR192"
+API_KEY = "airsoft-demo-key-2024"
 
-# Ключевые слова
 KEYWORDS = {
-    "Страйкбольное оружие": ["ak", "hk", "m4", "винтовка", "автомат", "пистолет", "дробовик", "калаш", "калашников"],
-    "Снаряжение и защита": ["жилет", "шлем", "каска", "разгрузка", "бронежилет", "подсумок", "рюкзак", "наколенники"],
+    "Страйкбольное оружие": ["ak", "hk", "m4", "винтовка", "автомат", "пистолет", "дробовик", "калаш"],
+    "Снаряжение и защита": ["жилет", "шлем", "каска", "разгрузка", "бронежилет", "подсумок", "рюкзак"],
     "Аксессуары и Запчасти": ["магазин", "прицел", "оптика", "фонарь", "лазер", "аккумулятор", "ремни"]
 }
 
@@ -27,7 +28,7 @@ def predict_category(text: str) -> str:
                 return cat
     return "Аксессуары и Запчасти"
 
-def predict_subcategory(text: str, category: str) -> str:
+def predict_subcategory(text: str) -> str:
     text_lower = text.lower()
     for key, subcat in SUBCAT.items():
         if key in text_lower:
@@ -49,7 +50,7 @@ async def predict(request: PredictRequest, x_api_key: str = Header(...)):
         raise HTTPException(401, "Invalid API key")
     
     category = predict_category(request.text)
-    subcategory = predict_subcategory(request.text, category)
+    subcategory = predict_subcategory(request.text)
     
     predictions = [{
         "object_id": "1",
@@ -65,24 +66,29 @@ async def predict(request: PredictRequest, x_api_key: str = Header(...)):
 async def health():
     return {"status": "ok"}
 
+# Gradio интерфейс
 def gradio_predict(text, api_key):
     if api_key != API_KEY:
         return "❌ Неверный ключ"
-    import requests
-    resp = requests.post("http://localhost:8000/predict", headers={"X-API-Key": api_key}, json={"post_id":"1","text":text,"photos":[]})
-    return resp.json()
+    category = predict_category(text)
+    subcategory = predict_subcategory(text)
+    return f"**Категория:** {category}\n**Подкатегория:** {subcategory}\n**Уверенность:** 0.8"
 
-with gr.Blocks() as demo:
-    gr.Markdown("# Страйкбол Классификатор\nby aNkeR192")
-    gr.Markdown("**Лёгкая версия** — по ключевым словам")
-    api_input = gr.Textbox(label="API Key", type="password", value=API_KEY)
-    text_input = gr.Textbox(label="Текст объявления", lines=2)
-    output = gr.JSON(label="Результат")
-    btn = gr.Button("Распознать")
+with gr.Blocks(title="Страйкбол Классификатор", theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🔫 Страйкбол Классификатор\n*by aNkeR192*")
+    gr.Markdown("Введите текст объявления и получите категорию и подкатегорию снаряжения.")
+    
+    with gr.Row():
+        api_input = gr.Textbox(label="🔑 API Key", type="password", value=API_KEY)
+        text_input = gr.Textbox(label="📝 Текст объявления", lines=3, placeholder="Пример: продаю автомат AK и тактический жилет")
+    
+    output = gr.Markdown(label="📊 Результат")
+    btn = gr.Button("🚀 Распознать", variant="primary")
     btn.click(gradio_predict, inputs=[text_input, api_input], outputs=output)
+    
+    gr.Markdown("---\n**Примеры:** `автомат ak` → Оружие → AK | `тактический жилет` → Снаряжение → Жилет")
 
+# Запуск
 if __name__ == "__main__":
-    import threading
-    threading.Thread(target=lambda: demo.launch(server_port=7860)).start()
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    threading.Thread(target=lambda: demo.launch(server_name="0.0.0.0", server_port=7860)).start()
+    uvicorn.run(app, host="0.0.0.0", port=10000)
