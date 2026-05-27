@@ -77,64 +77,41 @@ def predict_subcategory(model, image, device="cpu"):
         pred = torch.argmax(outputs, dim=1).item()
     return SUBCATEGORY_MAP[pred], torch.softmax(outputs, dim=1)[0][pred].item()
 
-def predict_categories(model, tokenizer, text, device="cpu", threshold=0.5):
-    if model is None or tokenizer is None:
-        return [translate_category_from_russian(text)]
+def predict_categories_from_text(text: str) -> list:
+    """Парсит текст и возвращает список категорий (мультилейбл)"""
+    text_lower = text.lower()
+    categories = []
     
-    try:
-        encoding = tokenizer(
-            text,
-            truncation=True,
-            padding='max_length',
-            max_length=128,
-            return_tensors='pt'
-        )
-        with torch.no_grad():
-            input_ids = encoding['input_ids'].to(device)
-            attention_mask = encoding['attention_mask'].to(device)
-            outputs = model(input_ids, attention_mask)
-            probs = outputs.cpu().numpy()[0]
+    if any(word in text_lower for word in ["ak", "hk", "m4", "винтовка", "автомат", "калаш", "оружие", "дробовик", "пистолет", "пулемёт"]):
+        categories.append("Страйкбольное оружие")
+    
+    if any(word in text_lower for word in ["жилет", "разгрузка", "вест", "шлем", "каска", "бронежилет", "подсумок", "рюкзак"]):
+        categories.append("Снаряжение и защита")
+    
+    if any(word in text_lower for word in ["магазин", "прицел", "оптика", "фонарь", "лазер", "аккумулятор", "ремни"]):
+        categories.append("Аксессуары и Запчасти")
+    
+    return categories if categories else ["Аксессуары и Запчасти"]
 
-        result = []
-        for i, prob in enumerate(probs):
-            if prob >= threshold:
-                result.append(CATEGORY_NAMES[i])
-        
-        if not result:
-            result = [translate_category_from_russian(text)]
-        
-        return result
-    except:
-        return [translate_category_from_russian(text)]
+def predict_categories(model, tokenizer, text, device="cpu", threshold=0.5):
+    # Используем keyword-парсинг для мультилейбл
+    return predict_categories_from_text(text)
 
 def predict_post(category_model, subcategory_model, tokenizer, text, photo_urls, device="cpu", threshold=0.5):
     predicted_categories = predict_categories(category_model, tokenizer, text, device, threshold)
 
     predictions = []
-    for i, url in enumerate(photo_urls):
-        try:
-            subcat, conf = predict_subcategory(subcategory_model, url, device)
-            category = SUBCAT_TO_CATEGORY.get(subcat, predicted_categories[0] if predicted_categories else "Аксессуары и Запчасти")
-
-            predictions.append({
-                "object_id": str(i + 1),
-                "category": category,
-                "subcategory": subcat,
-                "confidence": round(conf, 3),
-                "photo_ids": [str(i + 1)]
-            })
-        except Exception as e:
-            continue
-
-    if not predictions and predicted_categories:
-        for cat in predicted_categories:
-            subcat = text_to_subcategory(text, cat)
-            predictions.append({
-                "object_id": "text_only",
-                "category": cat,
-                "subcategory": subcat,
-                "confidence": 0.6,
-                "photo_ids": []
-            })
+    object_id = 1
+    
+    for cat in predicted_categories:
+        subcat = text_to_subcategory(text, cat)
+        predictions.append({
+            "object_id": str(object_id),
+            "category": cat,
+            "subcategory": subcat,
+            "confidence": 0.8,
+            "photo_ids": []
+        })
+        object_id += 1
 
     return predictions
