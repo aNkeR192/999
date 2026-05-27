@@ -69,10 +69,3 @@ python app.py
 
 - Swagger: `http://localhost:8000/docs`
 - Gradio: `http://localhost:7860`
-
-## Деплой на Hugging Face Spaces
-
-1. Создайте Space с SDK Gradio
-2. Загрузите файлы проекта
-3. Добавьте секрет `API_KEY`
-```
